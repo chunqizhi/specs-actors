@@ -35,6 +35,9 @@ type State struct {
 
 	// Epoch tracks for which epoch the Reward was computed
 	Epoch abi.ChainEpoch
+
+	// TotalMined tracks the total FIL awared to block miners
+	TotalMined abi.TokenAmount
 }
 
 func ConstructState(currRealizedPower abi.StoragePower) *State {
@@ -47,6 +50,7 @@ func ConstructState(currRealizedPower abi.StoragePower) *State {
 		ThisEpochReward:        big.Zero(),
 		ThisEpochBaselinePower: InitBaselinePower(),
 		Epoch:                  -1,
+		TotalMined:             big.Zero(),
 	}
 
 	st.updateToNextEpochWithReward(currRealizedPower)
