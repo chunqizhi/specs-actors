@@ -647,6 +647,10 @@ func constructStateHarness(t *testing.T, periodBoundary abi.ChainEpoch) *stateHa
 	emptyMap, err := adt.MakeEmptyMap(store).Root()
 	require.NoError(t, err)
 
+	emptyBitfield := bitfield.NewFromSet(nil)
+	emptyBitfieldCid, err := store.Put(store.Context(), emptyBitfield)
+	require.NoError(t, err)
+
 	emptyArray, err := adt.MakeEmptyArray(store).Root()
 	require.NoError(t, err)
 	emptyDeadline := miner.ConstructDeadline(emptyArray)
@@ -682,7 +686,7 @@ func constructStateHarness(t *testing.T, periodBoundary abi.ChainEpoch) *stateHa
 	infoCid, err := store.Put(context.Background(), &info)
 	require.NoError(t, err)
 
-	state, err := miner.ConstructState(infoCid, periodBoundary, emptyArray, emptyMap, emptyDeadlinesCid)
+	state, err := miner.ConstructState(infoCid, periodBoundary, emptyBitfieldCid, emptyArray, emptyMap, emptyDeadlinesCid)
 	require.NoError(t, err)
 
 	return &stateHarness{

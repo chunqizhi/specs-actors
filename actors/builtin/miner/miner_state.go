@@ -33,6 +33,9 @@ type State struct {
 	// Sectors that have been pre-committed but not yet proven.
 	PreCommittedSectors cid.Cid // Map, HAMT[SectorNumber]SectorPreCommitOnChainInfo
 
+	// Allocated sector IDs. Sector IDs can never be reused once allocated.
+	AllocatedSectors cid.Cid // BitField
+
 	// Information for all proven and not-yet-expired sectors.
 	Sectors cid.Cid // Array, AMT[SectorNumber]SectorOnChainInfo (sparse)
 
@@ -149,7 +152,7 @@ const (
 	SectorHealthy
 )
 
-func ConstructState(infoCid cid.Cid, periodStart abi.ChainEpoch, emptyArrayCid, emptyMapCid, emptyDeadlinesCid cid.Cid) (*State, error) {
+func ConstructState(infoCid cid.Cid, periodStart abi.ChainEpoch, emptyBitfieldCid, emptyArrayCid, emptyMapCid, emptyDeadlinesCid cid.Cid) (*State, error) {
 	return &State{
 		Info: infoCid,
 
@@ -159,6 +162,7 @@ func ConstructState(infoCid cid.Cid, periodStart abi.ChainEpoch, emptyArrayCid, 
 		InitialPledgeRequirement: abi.NewTokenAmount(0),
 
 		PreCommittedSectors: emptyMapCid,
+		AllocatedSectors:    emptyBitfieldCid,
 		Sectors:             emptyArrayCid,
 		ProvingPeriodStart:  periodStart,
 		CurrentDeadline:     0,
@@ -229,6 +233,55 @@ func (st *State) GetMaxAllowedFaults(store adt.Store) (uint64, error) {
 		return 0, err
 	}
 	return 2 * sectorCount, nil
+}
+
+func (st *State) AllocateSectorNumber(store adt.Store, sectorNo abi.SectorNumber) error {
+	// This will likely already have been checked, but this is a good place
+	// to catch any mistakes.
+	if sectorNo > abi.MaxSectorNumber {
+		return xerrors.Errorf("sector number out of range: %d", sectorNo)
+	}
+
+	allocatedSectors := new(bitfield.BitField)
+	if err := store.Get(store.Context(), st.AllocatedSectors, allocatedSectors); err != nil {
+		return xerrors.Errorf("failed to load allocated sectors bitfield: %w", err)
+	}
+	if allocated, err := allocatedSectors.IsSet(uint64(sectorNo)); err != nil {
+		return xerrors.Errorf("failed to lookup sector number in allocated sectors bitfield: %w", err)
+	} else if allocated {
+		return xerrors.Errorf("sector number %d has already been allocated", sectorNo)
+	}
+	allocatedSectors.Set(uint64(sectorNo))
+
+	// TODO: return an illegal argument error when we fail because the bitfield is too big
+	// https://github.com/filecoin-project/specs-actors/issues/597
+	if root, err := store.Put(store.Context(), allocatedSectors); err != nil {
+		return xerrors.Errorf("failed to store allocated sectors bitfield after adding sector %d: %w", sectorNo, err)
+	} else {
+		st.AllocatedSectors = root
+	}
+	return nil
+}
+
+func (st *State) MaskSectorNumbers(store adt.Store, sectorNos *bitfield.BitField) error {
+	allocatedSectors := new(bitfield.BitField)
+	if err := store.Get(store.Context(), st.AllocatedSectors, &allocatedSectors); err != nil {
+		return xerrors.Errorf("failed to load allocated sectors bitfield: %w", err)
+	}
+
+	allocatedSectors, err := bitfield.MergeBitFields(allocatedSectors, sectorNos)
+	if err != nil {
+		return err
+	}
+
+	// TODO: return an illegal argument error when we fail because the bitfield is too big
+	// https://github.com/filecoin-project/specs-actors/issues/597
+	if root, err := store.Put(store.Context(), allocatedSectors); err != nil {
+		return xerrors.Errorf("failed to mask allocated sectors bitfield: %w", err)
+	} else {
+		st.AllocatedSectors = root
+	}
+	return nil
 }
 
 func (st *State) PutPrecommittedSector(store adt.Store, info *SectorPreCommitOnChainInfo) error {
@@ -1073,7 +1126,7 @@ func (st *State) GetAvailableBalance(actorBalance abi.TokenAmount) abi.TokenAmou
 // Returns a quantization spec that quantizes values to the last epoch in each deadline.
 func (st *State) QuantEndOfDeadline() QuantSpec {
 	// Proving period start is the first epoch of the first deadline, so we want values that are earlier by one.
-	return NewQuantSpec(WPoStChallengeWindow, st.ProvingPeriodStart - 1)
+	return NewQuantSpec(WPoStChallengeWindow, st.ProvingPeriodStart-1)
 }
 
 func (st *State) AssertBalanceInvariants(balance abi.TokenAmount) {
