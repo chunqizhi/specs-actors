@@ -704,6 +704,7 @@ func (a Actor) ConfirmSectorProofsValid(rt Runtime, params *builtin.ConfirmSecto
 			activation := rt.CurrEpoch()
 			duration := precommit.Info.Expiration - activation
 			power := QAPowerForWeight(info.SectorSize, duration, precommit.DealWeight, precommit.VerifiedDealWeight)
+			dayReward := ExpectedDayRewardForPower(epochReward, pwrTotal.QualityAdjPower, power)
 			initialPledge := InitialPledgeForPower(power, pwrTotal.QualityAdjPower, baselinePower,
 				pwrTotal.PledgeCollateral, epochReward, circulatingSupply)
 
@@ -719,6 +720,7 @@ func (a Actor) ConfirmSectorProofsValid(rt Runtime, params *builtin.ConfirmSecto
 				DealWeight:         precommit.DealWeight,
 				VerifiedDealWeight: precommit.VerifiedDealWeight,
 				InitialPledge:      initialPledge,
+				ExpectedDayReward:  dayReward,
 			}
 			newSectors = append(newSectors, &newSectorInfo)
 			newSectorNos = append(newSectorNos, newSectorInfo.SectorNumber)
@@ -2411,7 +2413,7 @@ func terminationPenalty(sectorSize abi.SectorSize, currEpoch abi.ChainEpoch, epo
 	totalFee := big.Zero()
 	for _, s := range sectors {
 		sectorPower := QAPowerForSector(sectorSize, s)
-		fee := PledgePenaltyForTermination(s.InitialPledge, currEpoch-s.Activation, epochTargetReward, networkQAPower, sectorPower)
+		fee := PledgePenaltyForTermination(s.InitialPledge, s.ExpectedDayReward, currEpoch-s.Activation, epochTargetReward, networkQAPower, sectorPower)
 		totalFee = big.Add(fee, totalFee)
 	}
 	return totalFee
