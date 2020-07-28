@@ -83,7 +83,7 @@ var MaxSealDuration = map[abi.RegisteredSealProof]abi.ChainEpoch{
 
 // Number of epochs between publishing the precommit and when the challenge for interactive PoRep is drawn
 // used to ensure it is not predictable by miner.
-var PreCommitChallengeDelay = abi.ChainEpoch(150)
+var PreCommitChallengeDelay = abi.ChainEpoch(125) // 1 hour
 
 // Lookback from the current epoch for state view for leader elections.
 const ElectionLookback = abi.ChainEpoch(1) // PARAM_FINISH
@@ -92,15 +92,15 @@ const ElectionLookback = abi.ChainEpoch(1) // PARAM_FINISH
 // This lookback exists so that deadline windows can be non-overlapping (which make the programming simpler)
 // but without making the miner wait for chain stability before being able to start on PoSt computation.
 // The challenge is available this many epochs before the window is actually open to receiving a PoSt.
-const WPoStChallengeLookback = abi.ChainEpoch(20)
+const WPoStChallengeLookback = abi.ChainEpoch(16) // 8 minutes
 
 // Minimum period before a deadline's challenge window opens that a fault must be declared for that deadline.
 // This lookback must not be less than WPoStChallengeLookback lest a malicious miner be able to selectively declare
 // faults after learning the challenge value.
-const FaultDeclarationCutoff = WPoStChallengeLookback + 50
+const FaultDeclarationCutoff = WPoStChallengeLookback + 42 // 29 minutes
 
 // The maximum age of a fault before the sector is terminated.
-var FaultMaxAge = WPoStProvingPeriod * 14
+var FaultMaxAge = WPoStProvingPeriod * 14 // 14 days
 
 // Staging period for a miner worker key change.
 // Finality is a harsh delay for a miner who has lost their worker key, as the miner will miss Window PoSts until

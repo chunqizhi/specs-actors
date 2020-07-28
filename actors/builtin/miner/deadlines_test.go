@@ -78,7 +78,7 @@ func TestProvingPeriodDeadlines(t *testing.T) {
 	})
 
 	t.Run("deadline boundaries", func(t *testing.T) {
-		periodStart := abi.ChainEpoch(50000)
+		periodStart := abi.ChainEpoch(60000)
 		{
 			// First epoch of deadline zero
 			curr := periodStart
